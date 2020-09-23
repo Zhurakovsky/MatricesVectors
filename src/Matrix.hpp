@@ -6,6 +6,7 @@
 #include <initializer_list>
 #include <tuple>
 #include <type_traits>
+#include <numeric>
 
 #include "Vector.hpp"
 
@@ -27,7 +28,14 @@ template <class T>
 class Vector;
 
 template <class T>
-class Matrix
+class Matrix;
+
+template<typename T> std::variant<Vector<T>, Matrix<T>> operator* (Matrix<T>& left, Matrix<T>& right);
+template<typename T> std::variant<Vector<T>, Matrix<T>> operator* (Matrix<T>& left, Vector<T>& right);
+template<typename T> Matrix<T> operator+(Matrix<T>& left, Matrix<T>& right);
+template<typename T> Matrix<T> operator+(Matrix<T>& left, Vector<T>& right);
+
+template <class T> class Matrix
 {
 public:
     Matrix(size_t rows, size_t cols, const std::initializer_list<T>& l)
@@ -74,14 +82,105 @@ public:
 
     ~Matrix() = default;
 
+    template <typename TT> friend std::variant<Vector<TT>, Matrix<TT>> operator* (Matrix<TT>& left, Matrix<TT>& right);
+    template <typename TT> friend std::variant<Vector<TT>, Matrix<TT>> operator* (Matrix<TT>& left, Vector<TT>& right);
+    template <typename TT> friend Matrix<TT> operator+(Matrix<TT>& left, Matrix<TT>& right);
+    template <typename TT> friend Matrix<TT> operator+(Matrix<TT>& left, Vector<TT>& right);
+
+    Matrix& operator+(const Matrix& arg)
+    {
+        // TODO
+    }
+
+    Matrix& operator+(const Vector<T>& arg)
+    {
+        // TODO
+    }
+    
+    Matrix& operator*(const Matrix& mult)
+    {
+        // TODO
+    }
+
+    Matrix& operator*(const Vector<T>& mult)
+    {
+        // TODO
+    }
+
+    template<typename K> Matrix& operator*(const K& mult)
+    {
+        // TODO
+    }
+
+     Matrix& operator+=(const Matrix& arg)
+    {
+        return (*this) + arg;
+    }
+
+    Matrix& operator+=(const Vector<T>& arg)
+    {
+        return (*this) + arg;
+    }
+
+    Matrix& operator*=(const Matrix& mult)
+    {
+        return (*this) * mult;
+    }
+
+    Matrix& operator*=(const Vector<T>& mult)
+    {
+        return (*this) * mult;
+    }
+
+    template<typename K> Matrix& operator+=(const K& arg)
+    {
+        if (!std::is_arithmetic<K>::value)
+        {   
+            return (*this);
+        }
+        return (*this) + arg;
+    }
+
+    template<typename K> Matrix& operator*=(const K& mult)
+    {
+        if (!std::is_arithmetic<K>::value)
+        {   
+            return (*this);
+        }
+        return (*this) * mult;
+    }
+
     MatrixState GetMatrixState() const
     {
         return matrix_state_;
     }
 
-    std::tuple<size_t, size_t, std::vector<std::vector<T>>> GetData() const
+    std::vector<std::vector<T>> GetData() const
     {
-        return std::tuple{rows_, cols_, mat_};
+        return mat_;
+    }
+
+    std::vector<T> GetRow(size_t idx) const
+    {
+        std::vector<T> res();
+        if (idx < mat_.size())
+        {
+            res.emplace_back(mat_.at(idx).begin(), mat_.at(idx).end());
+        }
+        return res;
+    }
+
+    std::vector<T> GetCol(size_t idx) const
+    {
+        std::vector<T> res;
+        if (idx < (mat_.begin()->size()))
+        {
+            for (const auto& row : mat_)
+            {
+                res.emplace_back(row.at(idx));
+            }
+        }
+        return res;
     }
 
     friend ostream & operator << (ostream &out, const Matrix &m)
@@ -91,7 +190,8 @@ public:
             out << "Matrix undefined";
             return out;
         }
-        const auto [rows, cols, mat] = m.GetData();
+        const auto mat = m.GetData(); 
+        
         for (auto& row : mat)
         {
             for (const auto& col : row)
@@ -103,13 +203,44 @@ public:
         
         return out;
     }
+
+    std::tuple<size_t, size_t> GetDimentions() const
+    {
+        return std::tuple{rows_, cols_};
+    }
+
+    bool IsStateGood() const
+    {
+        return matrix_state_ == MatrixState::MATRIX_OK;
+    }
     
 private:
     size_t rows_;
     size_t cols_;
     MatrixState matrix_state_;
     std::vector<std::vector<T>> mat_;
+
 };
+
+template <typename T> std::variant<Vector<T>, Matrix<T>> operator* (Matrix<T>& left, Matrix<T>& right)
+{
+    // TODO
+}
+
+template <typename T> std::variant<Vector<T>, Matrix<T>> operator* (Matrix<T>& left, Vector<T>& right)
+{
+    // TODO
+}
+
+template <typename T> Matrix<T> operator+(Matrix<T>& left, Matrix<T>& right)
+{
+    // TODO
+}
+
+template <typename T> Matrix<T> operator+(Matrix<T>& left, Vector<T>& right)
+{
+    // TODO
+}
 
 } // namespace matrix
 

@@ -6,7 +6,6 @@
 #include <initializer_list>
 #include <algorithm>
 #include <tuple>
-#include <type_traits>
 #include <typeinfo>
 #include <variant>
 #include <optional>
@@ -19,12 +18,12 @@ namespace matrix
 {
 namespace
 {
-    enum class VectorType
-    {
-        VECTOR_UNDEFINED,
-        VECTOR_ROW,
-        VECTOR_COL
-    };
+enum class VectorType
+{
+    VECTOR_UNDEFINED,
+    VECTOR_ROW,
+    VECTOR_COL
+};
 
 } // namespace
 
@@ -34,38 +33,43 @@ class Matrix;
 template <class T>
 class Vector;
 
-template<typename T> std::variant<Vector<T>, Matrix<T>> operator* (Vector<T>& lhs, Vector<T>& rhs);
+template<typename T> std::variant<Vector<T>, Matrix<T>> operator* (Vector<T>& left, Vector<T>& right);
+template<typename T> std::variant<Vector<T>, Matrix<T>> operator* (Vector<T>& left, Matrix<T>& right);
+template<typename T> Vector<T> operator+(Vector<T>& left, Vector<T>& right);
+template<typename T> Vector<T> operator+(Vector<T>& left, Matrix<T>& right);
 
-template <class T>
-class Vector
+template <class T> class Vector
 {
 public:
-
     Vector(size_t rows, size_t cols, std::initializer_list<T> l)
     : Vector(rows, cols, std::vector<T>(l))
     {}
-    
+
     Vector(size_t rows, size_t cols, std::vector<T> v) 
     : rows_{rows},
     cols_{cols},
-    vector_type_{(rows == 1) 
-        ? VectorType::VECTOR_ROW : ((cols == 1) 
-        ? VectorType::VECTOR_COL : VectorType::VECTOR_UNDEFINED)},
+    vector_type_{(rows == 1) ? VectorType::VECTOR_ROW : ((cols == 1) ? VectorType::VECTOR_COL : VectorType::VECTOR_UNDEFINED)},
     vec_{v} 
+    {}
+
+    ~Vector() = default;
+
+    template <typename TT> friend std::variant<Vector<TT>, Matrix<TT>> operator* (Vector<TT>& left, Vector<TT>& right);
+    template <typename TT> friend std::variant<Vector<TT>, Matrix<TT>> operator* (Vector<TT>& left, Matrix<TT>& right);
+    template <typename TT> friend Vector<TT> operator+(Vector<TT>& left, Vector<TT>& right);
+    template <typename TT> friend Vector<TT> operator+(Vector<TT>& left, Matrix<TT>& right);
+
+    Vector& operator+(const Vector& arg)
     {
-        //cout << "Constructed vector of size " << l.size() << endl;
+        // TODO
     }
 
-    ~Vector()
+    Vector& operator+(const Matrix<T>& arg)
     {
-        //cout << "Destructed vector of size " << vec.size() << endl;
+        // TODO
     }
-    template <typename TT>
-    friend std::variant<Vector<TT>, Matrix<TT>> operator* (Vector<TT>& left, Vector<TT>& right);
-    //friend Container<T> operator+ <> (Container<T>& lhs, Container<T>& rhs);
     
     Vector& operator*(const Vector& mult)
-    //std::variant<Vector&>&& operator*(Vector& mult)
     {
         if (GetType() == mult.GetType())
         {
@@ -98,8 +102,42 @@ public:
         return (*this);
     }
 
-    template<typename K>
-    Vector& operator*(const K& mult)
+    Vector& operator*(const Matrix<T>& mult)
+    {
+        if (!IsStateGood() || !mult.IsStateGood())
+        {
+            cout << "Bad state. Cannot multiply." << endl;
+            return (*this);
+        }
+
+        const auto [mult_rows, mult_cols] = mult.GetDimentions();
+
+        if ((cols_ != mult_rows) || (GetType() != VectorType::VECTOR_ROW))
+        {
+            cout << "Bad multiply conditions. Cannot multiply." << endl;
+            return (*this);
+        }
+
+        std::vector<T> data;
+        for (size_t i = 0; i < mult_cols; i++)
+        {
+            auto col_data = mult.GetCol(i);
+            T tmp = 0;
+            for (size_t j = 0; j < mult_rows; j++)
+            {
+                tmp += (vec_.at(j) * col_data.at(j));
+            }
+            data.emplace_back(tmp);
+        }
+
+        vec_.clear();
+        cols_ = data.size();
+        std::copy(data.begin(), data.end(), std::back_inserter(vec_));
+
+        return (*this);
+    }
+
+    template<typename K> Vector& operator*(const K& mult)
     {
         if (!std::is_arithmetic<K>::value)
         {   
@@ -114,13 +152,36 @@ public:
         return (*this);
     }
 
+    Vector& operator+=(const Vector& arg)
+    {
+        return (*this) + arg;
+    }
+
+    Vector& operator+=(const Matrix<T>& arg)
+    {
+        return (*this) + arg;
+    }
+
     Vector& operator*=(const Vector& mult)
     {
         return (*this) * mult;
     }
 
-    template<typename K>
-    Vector& operator*=(const K& mult)
+    Vector& operator*=(const Matrix<T>& mult)
+    {
+        return (*this) * mult;
+    }
+
+    template<typename K> Vector& operator+=(const K& arg)
+    {
+        if (!std::is_arithmetic<K>::value)
+        {   
+            return (*this);
+        }
+        return (*this) + arg;
+    }
+
+    template<typename K> Vector& operator*=(const K& mult)
     {
         if (!std::is_arithmetic<K>::value)
         {   
@@ -129,18 +190,16 @@ public:
         return (*this) * mult;
     }
 
-
-
     friend ostream & operator << (ostream &out, const Vector &v)
     {
-        if (v.isRow())
+        if (v.IsRow())
         {
             for (const auto& val : v.GetData())
             {
                 out << val << " ";
             }
         }
-        else if (v.isCol())
+        else if (v.IsCol())
         {
             for (const auto& val : v.GetData())
             {
@@ -170,13 +229,63 @@ public:
         return vec_;
     }
 
+    std::tuple<size_t, size_t> GetDimentions() const
+    {
+        return std::tuple{rows_, cols_};
+    }
+
+    bool IsStateGood() const
+    {
+        return ((vector_type_ == VectorType::VECTOR_ROW) || (vector_type_ == VectorType::VECTOR_COL));
+    } 
+
+    std::vector<T> GetRow(size_t idx) const
+    {
+        std::vector<T> res;
+        if(vector_type_ == VectorType::VECTOR_ROW)
+        {
+            if(idx < rows_)
+            {
+                res = vec_;
+            }
+        }
+        else if(vector_type_ == VectorType::VECTOR_COL)
+        {
+            if(idx < rows_)
+            {
+                res.emplace_back(vec_.at(idx));
+            }
+        }
+        return res;
+    }
+
+    std::vector<T> GetCol(size_t idx) const
+    {
+        std::vector<T> res();
+        if(vector_type_ == VectorType::VECTOR_COL)
+        {
+            if(idx < cols_)
+            {
+                res.emplace_back(vec_.begin(), vec_.end());
+            }
+        }
+        else if(vector_type_ == VectorType::VECTOR_ROW)
+        {
+            if(idx < cols_)
+            {
+                res.emplace_back(vec_.at(idx));
+            }
+        }
+
+        return res;
+    }
+    
     template <typename K>
     std::optional<T> ScalarMultiply(const K& mult)
     {
-        std::optional<T> res = nullopt;
+        std::optional<T> res{nullopt};
         if (typeid(K)==typeid(Vector))
         {
-            //cout << "Scalar Mult Vector with Vector!!!" << endl;
             if (mult.GetSize() == this->GetSize())
             {
                 const size_t vector_size = this->GetSize(); 
@@ -200,27 +309,19 @@ private:
     VectorType vector_type_{VectorType::VECTOR_UNDEFINED};
     std::vector<T> vec_;
 
-    bool isRow() const
+    bool IsRow() const
     {
         return vector_type_ == VectorType::VECTOR_ROW;
     }
 
-    bool isCol() const
+    bool IsCol() const
     {
         return vector_type_ == VectorType::VECTOR_COL;
     }
-
-    inline tuple<bool, bool> GetOrientation()
-    {
-        return {isRow(), isCol()};
-    }
 };
 
-template <typename T>
-std::variant<Vector<T>, Matrix<T>> operator* (Vector<T>& left, Vector<T>& right)
+template <typename T> std::variant<Vector<T>, Matrix<T>> operator* (Vector<T>& left, Vector<T>& right)
 {
-    // std::variant<Vector<T>, Matrix<T>>(Vector{1,1,{1}});
-
     cout << "Binary operator Vector * Vector called" << endl;
     if (left.GetType() == right.GetType())
     {
@@ -261,6 +362,78 @@ std::variant<Vector<T>, Matrix<T>> operator* (Vector<T>& left, Vector<T>& right)
     }
 
     return std::variant<Vector<T>, Matrix<T>>(Vector{0,0,{0}});
+}
+
+template <typename T> std::variant<Vector<T>, Matrix<T>> operator* (Vector<T>& left, Matrix<T>& right)
+{
+    cout << "Binary operator Vector * Matrix called" << endl;
+
+    if (!left.IsStateGood() || !right.IsStateGood())
+    {
+        cout << "Bad state. Cannot multiply." << endl;
+        return std::variant<Vector<T>, Matrix<T>>(Vector{0,0,{0}});
+    }
+
+    const auto [left_rows, left_cols] = left.GetDimentions();
+    const auto [right_rows, right_cols] = right.GetDimentions();
+
+    if (left_cols != right_rows)
+    {
+        cout << "Left cols != Right rows. Product undefined." << endl;
+        return std::variant<Vector<T>, Matrix<T>>(Vector{0,0,{0}});
+    }
+
+    std::vector<T> res_data;
+    for (size_t row = 0; row < left_rows; row++)
+    {
+        auto r = left.GetRow(row);
+        for (size_t col = 0; col < right_cols; col++)
+        {
+            auto c = right.GetCol(col);
+            
+            if (r.size() == c.size())
+            {
+                const size_t size = r.size();
+                T tmp = 0;
+                for (size_t i = 0; i < size; i++)
+                {
+                    tmp += (r.at(i) * c.at(i));
+                }
+                res_data.emplace_back(tmp);
+            }
+        }
+    }
+
+    if ((left_rows == 1) || (right_cols == 1))
+    {
+        return std::variant<Vector<T>, Matrix<T>>(Vector{left_rows,right_cols, res_data});
+    }
+    
+    return std::variant<Vector<T>, Matrix<T>>(Matrix{left_rows,right_cols, res_data});
+}
+
+template <typename T> Vector<T> operator+(Vector<T>& left, Vector<T>& right)
+{
+    const size_t left_size = left.GetSize();
+    const size_t right_size = right.GetSize();
+    if (left_size != right_size)
+    {
+        return Vector(0,0,{0});
+    }
+
+    auto [rows, cols] = left.GetDimentions();
+    std::vector<T> res;
+    for (size_t i = 0; i < left_size; i++)
+    {
+        res.emplace_back(left.GetData().at(i) + right.GetData().at(i));
+    }
+
+    return Vector(rows, cols, res);
+}
+
+template <typename T> Vector<T> operator+(Vector<T>& left, Matrix<T>& right)
+{
+    // TODO
 }
 
 } // namespace matrix
