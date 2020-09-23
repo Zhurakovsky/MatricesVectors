@@ -40,13 +40,18 @@ template <class T>
 class Vector
 {
 public:
-    Vector(size_t rows, size_t cols, std::initializer_list<T> l) 
+
+    Vector(size_t rows, size_t cols, std::initializer_list<T> l)
+    : Vector(rows, cols, std::vector<T>(l))
+    {}
+    
+    Vector(size_t rows, size_t cols, std::vector<T> v) 
     : rows_{rows},
     cols_{cols},
     vector_type_{(rows == 1) 
         ? VectorType::VECTOR_ROW : ((cols == 1) 
         ? VectorType::VECTOR_COL : VectorType::VECTOR_UNDEFINED)},
-    vec_{l} 
+    vec_{v} 
     {
         //cout << "Constructed vector of size " << l.size() << endl;
     }

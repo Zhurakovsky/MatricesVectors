@@ -31,49 +31,8 @@ class Matrix
 {
 public:
     Matrix(size_t rows, size_t cols, const std::initializer_list<T>& l)
-    : rows_{rows},
-      cols_{cols},
-      matrix_state_{(rows * cols) == l.size() ? MatrixState::MATRIX_OK : MatrixState::MATRIX_UNDEFINED},
-      mat_{[&]() {
-        if ((rows * cols) != l.size())
-        {
-            return std::vector<std::vector<T>>();
-        }
-
-        std::vector<std::vector<T>> tmp_mat;
-        const std::vector<T> v{l};
-        for (const auto& e : v) 
-        {
-            //cout << "*/*/* " << e << endl;
-        }
-        
-        //auto k = std::max(rows, cols);
-        for (size_t r = 0; r < rows; r++)
-        {
-            std::vector<T>tmp_row;
-            for (size_t c = 0; c < cols; c++)
-            {
-                size_t idx = r * cols + c;
-
-                T tmp_elem = v.at(idx);
-                //cout << "Idx: " << idx << " Elem: " << tmp_elem << "*****" << endl;
-
-                tmp_row.emplace_back(std::move(tmp_elem));
-            }
-            tmp_mat.emplace_back(std::move(tmp_row));
-        }
-        return tmp_mat;
-    }()}
-    {
-        if ((rows * cols) != l.size())
-        {
-            cout << "Wrong archive dimentions" << endl;
-        }
-        else
-        {
-            cout << "Constructed matrix " << rows << " x " << cols << " with " << l.size() << " elements." << endl;
-        }
-    }
+    : Matrix(rows, cols, std::vector<T>(l))
+    {}
 
     Matrix(size_t rows, size_t cols, const std::vector<T>& v)
     : rows_{rows},
@@ -86,13 +45,7 @@ public:
         }
 
         std::vector<std::vector<T>> tmp_mat;
-        //const std::vector<T> v{l};
-        for (const auto& e : v) 
-        {
-            //cout << "*/*/* " << e << endl;
-        }
         
-        //auto k = std::max(rows, cols);
         for (size_t r = 0; r < rows; r++)
         {
             std::vector<T>tmp_row;
@@ -101,7 +54,6 @@ public:
                 size_t idx = r * cols + c;
 
                 T tmp_elem = v.at(idx);
-                //cout << "Idx: " << idx << " Elem: " << tmp_elem << "*****" << endl;
 
                 tmp_row.emplace_back(std::move(tmp_elem));
             }
