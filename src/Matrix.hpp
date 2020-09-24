@@ -30,21 +30,21 @@ class Vector;
 template <class T>
 class Matrix;
 
-template<typename T> std::variant<Vector<T>, Matrix<T>> operator* (Matrix<T>& left, Matrix<T>& right);
-template<typename T> std::variant<Vector<T>, Matrix<T>> operator* (Matrix<T>& left, Vector<T>& right);
+template<typename T> Matrix<T> operator* (Matrix<T>& left, Matrix<T>& right);
+template<typename T> Matrix<T> operator* (Matrix<T>& left, Vector<T>& right);
 template<typename T> Matrix<T> operator+(Matrix<T>& left, Matrix<T>& right);
 template<typename T> Matrix<T> operator+(Matrix<T>& left, Vector<T>& right);
+template<typename T> Matrix<T> operator-(Matrix<T>& left, Matrix<T>& right);
+template<typename T> Matrix<T> operator-(Matrix<T>& left, Vector<T>& right);
 
 template <class T> class Matrix
 {
 public:
     Matrix(size_t rows, size_t cols, const std::initializer_list<T>& l)
-    : Matrix(rows, cols, std::vector<T>(l))
-    {}
+    : Matrix(rows, cols, std::vector<T>(l)) {}
 
     Matrix(size_t rows, size_t cols, const std::vector<T>& v)
-    : rows_{rows},
-      cols_{cols},
+    : rows_{rows}, cols_{cols},
       matrix_state_{(rows * cols) == v.size() ? MatrixState::MATRIX_OK : MatrixState::MATRIX_UNDEFINED},
       mat_{[&]() {
         if ((rows * cols) != v.size())
@@ -68,58 +68,290 @@ public:
             tmp_mat.emplace_back(std::move(tmp_row));
         }
         return tmp_mat;
-    }()}
-    {
-        if ((rows * cols) != v.size())
-        {
-            cout << "Wrong archive dimentions" << endl;
-        }
-        else
-        {
-            cout << "Constructed matrix " << rows << " x " << cols << " with " << v.size() << " elements." << endl;
-        }
-    }
+    }()}{}
 
+    Matrix(const Matrix&) = default;
+    Matrix(Matrix&&) = default;
+    Matrix& operator=(const Matrix&) = default;
+    Matrix& operator=(Matrix&&) = default;
     ~Matrix() = default;
 
-    template <typename TT> friend std::variant<Vector<TT>, Matrix<TT>> operator* (Matrix<TT>& left, Matrix<TT>& right);
-    template <typename TT> friend std::variant<Vector<TT>, Matrix<TT>> operator* (Matrix<TT>& left, Vector<TT>& right);
+    template <typename TT> friend Matrix<TT> operator* (Matrix<TT>& left, Matrix<TT>& right);
+    template <typename TT> friend Matrix<TT> operator* (Matrix<TT>& left, Vector<TT>& right);
     template <typename TT> friend Matrix<TT> operator+(Matrix<TT>& left, Matrix<TT>& right);
     template <typename TT> friend Matrix<TT> operator+(Matrix<TT>& left, Vector<TT>& right);
+    template <typename TT> friend Matrix<TT> operator-(Matrix<TT>& left, Matrix<TT>& right);
+    template <typename TT> friend Matrix<TT> operator-(Matrix<TT>& left, Vector<TT>& right);
 
     Matrix& operator+(const Matrix& arg)
     {
-        // TODO
+        if (!IsStateGood() || !arg.IsStateGood())
+        {
+            cout << "Bad state. Cannot Add." << endl;
+            return (*this);
+        }
+
+        const auto [arg_rows, arg_cols] = arg.GetDimentions();
+
+        if ((rows_ != arg_rows) || (cols_ != arg_cols))
+        {
+            cout << "Bad size. Cannot Add." << endl;
+            return (*this);
+        }
+
+        const auto& tmp_arg = arg.GetData();
+
+        for (size_t r = 0; r < arg_rows; r++)
+        {
+            for (size_t c = 0; c < arg_cols; c++ )
+            {
+                mat_[r][c] += tmp_arg[r][c];
+            }
+        }
+
+        return (*this);
     }
 
     Matrix& operator+(const Vector<T>& arg)
     {
-        // TODO
+        if (!IsStateGood() || !arg.IsStateGood())
+        {
+            cout << "Bad state. Cannot Add." << endl;
+            return (*this);
+        }
+
+        const auto [arg_rows, arg_cols] = arg.GetDimentions();
+
+        if ((rows_ != arg_rows) || (cols_ != arg_cols))
+        {
+            cout << "Bad size. Cannot Add." << endl;
+            return (*this);
+        }
+
+        const auto& tmp_arg = arg.GetData();
+
+        for (size_t r = 0; r < arg_rows; r++)
+        {
+            for (size_t c = 0; c < arg_cols; c++ )
+            {
+                mat_[r][c] += tmp_arg.at(r * arg_cols + c);
+            }
+        }
+
+        return (*this);
+    }
+
+    Matrix& operator-(const Vector<T>& arg)
+    {
+        if (!IsStateGood() || !arg.IsStateGood())
+        {
+            cout << "Bad state. Cannot Subtract." << endl;
+            return (*this);
+        }
+
+        const auto [arg_rows, arg_cols] = arg.GetDimentions();
+
+        if ((rows_ != arg_rows) || (cols_ != arg_cols))
+        {
+            cout << "Bad size. Cannot Subtract." << endl;
+            return (*this);
+        }
+
+        const auto& tmp_arg = arg.GetData();
+
+        for (size_t r = 0; r < arg_rows; r++)
+        {
+            for (size_t c = 0; c < arg_cols; c++ )
+            {
+                mat_[r][c] -= tmp_arg.at(r * arg_cols + c);
+            }
+        }
+
+        return (*this);
+    }
+
+    Matrix& operator-(const Matrix& arg)
+    {
+        if (!IsStateGood() || !arg.IsStateGood())
+        {
+            cout << "Bad state. Cannot Subtract." << endl;
+            return (*this);
+        }
+
+        const auto [arg_rows, arg_cols] = arg.GetDimentions();
+
+        if ((rows_ != arg_rows) || (cols_ != arg_cols))
+        {
+            cout << "Bad size. Cannot Subtract." << endl;
+            return (*this);
+        }
+
+        const auto& tmp_arg = arg.GetData();
+
+        for (size_t r = 0; r < arg_rows; r++)
+        {
+            for (size_t c = 0; c < arg_cols; c++ )
+            {
+                mat_[r][c] -= tmp_arg[r][c];
+            }
+        }
+
+        return (*this);
+    }
+
+    template<typename K> Matrix& operator+(const K& arg)
+    {
+        if (!std::is_arithmetic<K>::value)
+        {   
+            return (*this);
+        }
+        for (auto& row : mat_)
+        {
+            for (auto& col : row)
+            {
+                col += arg;
+            }
+        }
+        return (*this);
+    }
+
+    template<typename K> Matrix& operator-(const K& arg)
+    {
+        if (!std::is_arithmetic<K>::value)
+        {   
+            return (*this);
+        }
+        return (*this) + (-arg);
     }
     
     Matrix& operator*(const Matrix& mult)
     {
-        // TODO
+        if (!IsStateGood() || !mult.IsStateGood())
+        {
+            cout << "Bad State. Cannot multiply" << endl;
+            return (*this);
+        }
+
+        const auto [mult_rows, mult_cols] = mult.GetDimentions();
+
+        if (cols_ != mult_rows)
+        {
+            cout << "Bad size. Product undefined." << endl;
+            return (*this); 
+        }
+        
+        std::vector<T> res;
+        for (size_t row = 0; row < rows_; row++)
+        {
+            std::vector<T>row_data = GetRow(row);
+            for (size_t col = 0; col < mult_cols; col++)
+            {
+                std::vector<T>col_data = mult.GetCol(col);
+                T tmp = 0;
+                for (size_t i = 0; i < mult_rows; i++)
+                {
+                    tmp += (row_data.at(i) * col_data.at(i));
+                }
+                res.emplace_back(tmp);
+            }
+        }
+
+        Matrix  result(rows_, mult_cols, res);
+        Clear();
+        (*this) = result;
+
+        return (*this);
     }
 
     Matrix& operator*(const Vector<T>& mult)
     {
-        // TODO
+        if (!IsStateGood() || !mult.IsStateGood())
+        {
+            cout << "Bad State. Cannot multiply" << endl;
+            return (*this);
+        }
+
+        const auto [mult_rows, mult_cols] = mult.GetDimentions();
+
+        if (cols_ != mult_rows)
+        {
+            cout << "Bad size. Product undefined." << endl;
+            return (*this); 
+        }
+
+        std::vector<T> res;
+        for (size_t row = 0; row < rows_; row++)
+        {
+            std::vector<T>row_data = GetRow(row);
+            for (size_t col = 0; col < mult_cols; col++)
+            {
+                std::vector<T>col_data = mult.GetCol(col);
+                T tmp = 0;
+                for (size_t i = 0; i < mult_rows; i++)
+                {
+                    tmp += (row_data.at(i) * col_data.at(i));
+                }
+                res.emplace_back(tmp);
+            }
+        }
+
+        Matrix  result(rows_, mult_cols, res);
+        Clear();
+        (*this) = result;
+
+        return (*this);
     }
 
     template<typename K> Matrix& operator*(const K& mult)
     {
-        // TODO
+        if (!std::is_arithmetic<K>::value)
+        {   
+            return (*this);
+        }
+        for (auto& row : mat_)
+        {
+            for (auto& col : row)
+            {
+                col *= mult;
+            }
+        }
+        return (*this);
     }
 
-     Matrix& operator+=(const Matrix& arg)
+    template<typename K> Matrix& operator/(const K& mult)
+    {
+        if (!std::is_arithmetic<K>::value)
+        {   
+            return (*this);
+        }
+        for (auto& row : mat_)
+        {
+            for (auto& col : row)
+            {
+                col /= mult;
+            }
+        }
+        return (*this);
+    }
+
+    Matrix& operator+=(const Matrix& arg)
     {
         return (*this) + arg;
+    }
+
+    Matrix& operator-=(const Matrix& arg)
+    {
+        return (*this) - arg;
     }
 
     Matrix& operator+=(const Vector<T>& arg)
     {
         return (*this) + arg;
+    }
+
+    Matrix& operator-=(const Vector<T>& arg)
+    {
+        return (*this) - arg;
     }
 
     Matrix& operator*=(const Matrix& mult)
@@ -141,6 +373,15 @@ public:
         return (*this) + arg;
     }
 
+    template<typename K> Matrix& operator-=(const K& arg)
+    {
+        if (!std::is_arithmetic<K>::value)
+        {   
+            return (*this);
+        }
+        return (*this) - arg;
+    }
+
     template<typename K> Matrix& operator*=(const K& mult)
     {
         if (!std::is_arithmetic<K>::value)
@@ -150,7 +391,16 @@ public:
         return (*this) * mult;
     }
 
-    MatrixState GetMatrixState() const
+    template<typename K> Matrix& operator/=(const K& mult)
+    {
+        if (!std::is_arithmetic<K>::value)
+        {   
+            return (*this);
+        }
+        return (*this) / mult;
+    }
+
+    MatrixState GetState() const
     {
         return matrix_state_;
     }
@@ -162,10 +412,10 @@ public:
 
     std::vector<T> GetRow(size_t idx) const
     {
-        std::vector<T> res();
+        std::vector<T> res;
         if (idx < mat_.size())
         {
-            res.emplace_back(mat_.at(idx).begin(), mat_.at(idx).end());
+            res = mat_.at(idx);
         }
         return res;
     }
@@ -185,7 +435,7 @@ public:
 
     friend ostream & operator << (ostream &out, const Matrix &m)
     {
-        if (m.GetMatrixState() == MatrixState::MATRIX_UNDEFINED)
+        if (m.GetState() == MatrixState::MATRIX_UNDEFINED)
         {
             out << "Matrix undefined";
             return out;
@@ -220,26 +470,221 @@ private:
     MatrixState matrix_state_;
     std::vector<std::vector<T>> mat_;
 
+    void Clear()
+    {
+        mat_.clear();
+        rows_ = 0;
+        cols_ = 0;
+        matrix_state_ = MatrixState::MATRIX_UNDEFINED;
+    }
 };
 
-template <typename T> std::variant<Vector<T>, Matrix<T>> operator* (Matrix<T>& left, Matrix<T>& right)
+template <typename T> Matrix<T> operator* (Matrix<T>& left, Matrix<T>& right)
 {
-    // TODO
+    if (!left.IsStateGood() || !right.IsStateGood())
+    {
+        cout << "Bad State. Cannot multiply" << endl;
+        return Matrix{0,0,{0}};
+    }
+
+    const auto [left_rows, left_cols] = left.GetDimentions();
+    const auto [right_rows, right_cols] = right.GetDimentions();
+
+    if (left_cols != right_rows)
+    {
+        cout << "Bad size. Product undefined." << endl;
+        return Matrix{0,0,{0}};
+    }
+    
+    std::vector<T> res;
+    for (size_t row = 0; row < left_rows; row++)
+    {
+        std::vector<T>row_data = left.GetRow(row);
+        for (size_t col = 0; col < right_cols; col++)
+        {
+            std::vector<T>col_data = right.GetCol(col);
+            T tmp = 0;
+            for (size_t i = 0; i < row_data.size(); i++)
+            {
+                tmp += (row_data.at(i) * col_data.at(i));
+            }
+            res.emplace_back(tmp);
+        }
+    }
+    Matrix result(left_rows, right_cols, res);
+    return result;
 }
 
-template <typename T> std::variant<Vector<T>, Matrix<T>> operator* (Matrix<T>& left, Vector<T>& right)
+template <typename T> Matrix<T> operator* (Matrix<T>& left, Vector<T>& right)
 {
-    // TODO
+    if (!left.IsStateGood() || !right.IsStateGood())
+    {
+        cout << "Bad State. Cannot multiply" << endl;
+        return Matrix{0,0,{0}};
+    }
+
+    const auto [left_rows, left_cols] = left.GetDimentions();
+    const auto [right_rows, right_cols] = right.GetDimentions();
+
+    if (left_cols != right_rows)
+    {
+        cout << "Bad size. Product undefined." << endl;
+        return Matrix{0,0,{0}};
+    }
+    
+    std::vector<T> res;
+    for (size_t row = 0; row < left_rows; row++)
+    {
+        std::vector<T>row_data = left.GetRow(row);
+        for (size_t col = 0; col < right_cols; col++)
+        {
+            std::vector<T>col_data = right.GetCol(col);
+            T tmp = 0;
+            for (size_t i = 0; i < right_rows; i++)
+            {
+                tmp += (row_data.at(i) * col_data.at(i));
+            }
+            res.emplace_back(tmp);
+        }
+    }
+
+    return Matrix(left_rows, right_cols, res);
 }
 
 template <typename T> Matrix<T> operator+(Matrix<T>& left, Matrix<T>& right)
 {
-    // TODO
+    if (!left.IsStateGood() || !right.IsStateGood())
+    {
+        cout << "Bad State. Cannot Add" << endl;
+        return Matrix{0,0,{0}};
+    }
+
+    const auto [left_rows, left_cols] = left.GetDimentions();
+    const auto [right_rows, right_cols] = right.GetDimentions();
+
+    if ((left_rows != right_rows) || (left_cols != right_cols))
+    {
+        cout << "Bad size. Summ undefined." << endl;
+        return Matrix{0,0,{0}};
+    }
+
+    std::vector<T> res;
+    const auto& left_data = left.GetData();
+    const auto& right_data = right.GetData();
+
+    const size_t size = left_data.size();
+
+    for (size_t row = 0; row < left_rows; row++)
+    {
+        for (size_t col = 0; col < right_cols; col++)
+        {
+            res.emplace_back(left_data[row][col] + right_data[row][col]);
+        }
+    }
+
+    return Matrix(left_rows, right_cols, res);
 }
 
 template <typename T> Matrix<T> operator+(Matrix<T>& left, Vector<T>& right)
 {
-    // TODO
+    if (!left.IsStateGood() || !right.IsStateGood())
+    {
+        cout << "Bad State. Cannot Add" << endl;
+        return Matrix{0,0,{0}};
+    }
+
+    const auto [left_rows, left_cols] = left.GetDimentions();
+    const auto [right_rows, right_cols] = right.GetDimentions();
+
+    if ((left_rows != right_rows) || (left_cols != right_cols))
+    {
+        cout << "Bad size. Summ undefined." << endl;
+        return Matrix{0,0,{0}};
+    }
+
+    std::vector<T> res;
+    const auto& left_data = left.GetData();
+    const auto& right_data = right.GetData();
+
+    const size_t size = left_data.size();
+
+    for (size_t row = 0; row < left_rows; row++)
+    {
+        for (size_t col = 0; col < right_cols; col++)
+        {
+            res.emplace_back(left_data[row][col] + right_data[row * right_cols + col]);
+        }
+    }
+
+    return Matrix(left_rows, right_cols, res);
+}
+
+template <typename T> Matrix<T> operator-(Matrix<T>& left, Matrix<T>& right)
+{
+    if (!left.IsStateGood() || !right.IsStateGood())
+    {
+        cout << "Bad State. Cannot Add" << endl;
+        return Matrix{0,0,{0}};
+    }
+
+    const auto [left_rows, left_cols] = left.GetDimentions();
+    const auto [right_rows, right_cols] = right.GetDimentions();
+
+    if ((left_rows != right_rows) || (left_cols != right_cols))
+    {
+        cout << "Bad size. Summ undefined." << endl;
+        return Matrix{0,0,{0}};
+    }
+
+    std::vector<T> res;
+    const auto& left_data = left.GetData();
+    const auto& right_data = right.GetData();
+
+    const size_t size = left_data.size();
+
+    for (size_t row = 0; row < left_rows; row++)
+    {
+        for (size_t col = 0; col < left_cols; col++)
+        {
+            res.emplace_back(left_data[row][col] - right_data[row][col]);
+        }
+    }
+
+    return Matrix(left_rows, right_cols, res);
+}
+
+template <typename T> Matrix<T> operator-(Matrix<T>& left, Vector<T>& right)
+{
+    if (!left.IsStateGood() || !right.IsStateGood())
+    {
+        cout << "Bad State. Cannot Add" << endl;
+        return Matrix{0,0,{0}};
+    }
+
+    const auto [left_rows, left_cols] = left.GetDimentions();
+    const auto [right_rows, right_cols] = right.GetDimentions();
+
+    if ((left_rows != right_rows) || (left_cols != right_cols))
+    {
+        cout << "Bad size. Summ undefined." << endl;
+        return Matrix{0,0,{0}};
+    }
+
+    std::vector<T> res;
+    const auto& left_data = left.GetData();
+    const auto& right_data = right.GetData();
+
+    const size_t size = left_data.size();
+
+    for (size_t row = 0; row < left_rows; row++)
+    {
+        for (size_t col = 0; col < right_cols; col++)
+        {
+            res.emplace_back(left_data[row][col] - right_data[row * right_cols + col]);
+        }
+    }
+
+    return Matrix(left_rows, right_cols, res);
 }
 
 } // namespace matrix
